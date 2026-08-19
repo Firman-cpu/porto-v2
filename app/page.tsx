@@ -1,69 +1,603 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useRef } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 export default function Home() {
+  const aboutSceneRef = useRef<HTMLDivElement>(null);
+  const horizontalSceneRef = useRef<HTMLDivElement>(null);
+  const horizontalTrackRef = useRef<HTMLDivElement>(null);
+
+  const aboutRef = useRef<HTMLElement>(null);
+  const skillsRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const aboutScene = aboutSceneRef.current;
+    const horizontalScene = horizontalSceneRef.current;
+    const track = horizontalTrackRef.current;
+
+    const about = aboutRef.current;
+    const skills = skillsRef.current;
+
+    if (
+      !aboutScene ||
+      !horizontalScene ||
+      !track ||
+      !about ||
+      !skills
+    ) {
+      return;
+    }
+
+    const ctx = gsap.context(() => {
+      // ==================================================
+      // INITIAL
+      // ==================================================
+
+      gsap.set(about, {
+        yPercent: 100,
+      });
+
+      gsap.set(skills, {
+        xPercent: 100,
+      });
+
+      // ==================================================
+      // 1. ABOUT
+      //
+      // HERO tetap normal di belakang.
+      //
+      // About masuk dari bawah.
+      // ==================================================
+
+      gsap.to(about, {
+        yPercent: 0,
+
+        ease: "none",
+
+        scrollTrigger: {
+          trigger: aboutScene,
+
+          start: "top top",
+
+          end: "bottom top",
+
+          scrub: true,
+
+          pin: true,
+
+          pinSpacing: true,
+
+          anticipatePin: 1,
+        },
+      });
+
+      // ==================================================
+      // 2. SKILLS
+      //
+      // Setelah About selesai,
+      // Skills masuk dari kanan.
+      // ==================================================
+
+      gsap.to(skills, {
+        xPercent: 0,
+
+        ease: "none",
+
+        scrollTrigger: {
+          trigger: horizontalScene,
+
+          start: "top top",
+
+          end: () =>
+            `+=${window.innerHeight}`,
+
+          scrub: true,
+
+          pin: true,
+
+          pinSpacing: true,
+
+          anticipatePin: 1,
+        },
+      });
+
+      // ==================================================
+      // 3. HORIZONTAL
+      //
+      // Skills → Tools
+      // ==================================================
+
+      const getDistance = () => {
+        return (
+          track.scrollWidth -
+          window.innerWidth
+        );
+      };
+
+      gsap.to(track, {
+        x: () => -getDistance(),
+
+        ease: "none",
+
+        scrollTrigger: {
+          trigger: horizontalScene,
+
+          start: () =>
+            `top+=${window.innerHeight} top`,
+
+          end: () =>
+            `+=${getDistance()}`,
+
+          scrub: true,
+
+          invalidateOnRefresh: true,
+        },
+      });
+
+      // ==================================================
+      // REFRESH
+      // ==================================================
+
+      ScrollTrigger.refresh();
+    });
+
+    return () => {
+      ctx.revert();
+    };
+  }, []);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main
+      className="
+        w-full
+        overflow-x-hidden
+        bg-neutral-950
+      "
+    >
+
+      {/* ==================================================
+          HERO
+      ================================================== */}
+
+      <section
+        id="hero"
+        className="
+          relative
+          z-0
+          flex
+          h-screen
+          w-full
+          items-center
+          justify-center
+          overflow-hidden
+          bg-orange-500
+        "
+      >
+
+        <div className="text-center">
+
+          <p
+            className="
+              mb-6
+              text-sm
+              font-bold
+              uppercase
+              tracking-[0.5em]
+              text-orange-100
+            "
+          >
+            PORTFOLIO
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+          <h1
+            className="
+              text-7xl
+              font-black
+              text-white
+              md:text-9xl
+            "
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            HERO
+          </h1>
+
+          <p
+            className="
+              mt-6
+              text-lg
+              text-orange-100
+            "
           >
-            Documentation
-          </a>
+            Creative Developer
+          </p>
+
+          <p
+            className="
+              mt-10
+              text-sm
+              uppercase
+              tracking-[0.4em]
+              text-orange-100
+            "
+          >
+            Scroll ↓
+          </p>
+
         </div>
-      </main>
-    </div>
+
+      </section>
+
+
+      {/* ==================================================
+          ABOUT SCENE
+      ================================================== */}
+
+      <section
+        ref={aboutSceneRef}
+        className="
+          relative
+          h-[200vh]
+          w-full
+        "
+      >
+
+        {/* ==================================================
+            ABOUT
+        ================================================== */}
+
+        <section
+          ref={aboutRef}
+          id="about"
+          className="
+            absolute
+            left-0
+            top-0
+            z-10
+            flex
+            h-screen
+            w-full
+            items-center
+            justify-center
+            bg-white
+          "
+        >
+
+          <div className="text-center">
+
+            <p
+              className="
+                mb-6
+                text-sm
+                font-bold
+                uppercase
+                tracking-[0.5em]
+                text-orange-500
+              "
+            >
+              01 — ABOUT
+            </p>
+
+            <h2
+              className="
+                text-7xl
+                font-black
+                text-neutral-900
+                md:text-9xl
+              "
+            >
+              ABOUT
+            </h2>
+
+            <p
+              className="
+                mt-6
+                text-lg
+                text-neutral-500
+              "
+            >
+              About berhenti di sini.
+            </p>
+
+          </div>
+
+        </section>
+
+      </section>
+
+
+      {/* ==================================================
+          HORIZONTAL SCENE
+      ================================================== */}
+
+      <section
+        ref={horizontalSceneRef}
+        className="
+          relative
+          h-[200vh]
+          w-full
+          overflow-hidden
+        "
+      >
+
+        {/* ==================================================
+            HORIZONTAL TRACK
+        ================================================== */}
+
+        <div
+          ref={horizontalTrackRef}
+          className="
+            sticky
+            top-0
+            flex
+            h-screen
+            w-max
+          "
+        >
+
+          {/* ==================================================
+              SKILLS
+          ================================================== */}
+
+          <section
+            ref={skillsRef}
+            id="skills"
+            className="
+              flex
+              h-screen
+              w-screen
+              shrink-0
+              items-center
+              justify-center
+              bg-blue-500
+            "
+          >
+
+            <div className="text-center">
+
+              <p
+                className="
+                  mb-6
+                  text-sm
+                  font-bold
+                  uppercase
+                  tracking-[0.5em]
+                  text-blue-100
+                "
+              >
+                02 — SKILLS
+              </p>
+
+              <h2
+                className="
+                  text-7xl
+                  font-black
+                  text-white
+                  md:text-9xl
+                "
+              >
+                SKILLS
+              </h2>
+
+              <p
+                className="
+                  mt-6
+                  text-lg
+                  text-blue-100
+                "
+              >
+                Masuk dari kanan →
+              </p>
+
+            </div>
+
+          </section>
+
+
+          {/* ==================================================
+              TOOLS
+          ================================================== */}
+
+          <section
+            id="tools"
+            className="
+              flex
+              h-screen
+              w-screen
+              shrink-0
+              items-center
+              justify-center
+              bg-purple-500
+            "
+          >
+
+            <div className="text-center">
+
+              <p
+                className="
+                  mb-6
+                  text-sm
+                  font-bold
+                  uppercase
+                  tracking-[0.5em]
+                  text-purple-100
+                "
+              >
+                03 — TOOLS
+              </p>
+
+              <h2
+                className="
+                  text-7xl
+                  font-black
+                  text-white
+                  md:text-9xl
+                "
+              >
+                TOOLS
+              </h2>
+
+              <p
+                className="
+                  mt-6
+                  text-lg
+                  text-purple-100
+                "
+              >
+                Horizontal selesai ↓
+              </p>
+
+            </div>
+
+          </section>
+
+        </div>
+
+      </section>
+
+
+      {/* ==================================================
+          PROJECTS
+      ================================================== */}
+
+      <section
+        id="projects"
+        className="
+          flex
+          h-screen
+          w-full
+          items-center
+          justify-center
+          bg-green-500
+        "
+      >
+
+        <div className="text-center">
+
+          <p
+            className="
+              mb-6
+              text-sm
+              font-bold
+              uppercase
+              tracking-[0.5em]
+              text-green-100
+            "
+          >
+            04 — PROJECTS
+          </p>
+
+          <h2
+            className="
+              text-7xl
+              font-black
+              text-white
+              md:text-9xl
+            "
+          >
+            PROJECTS
+          </h2>
+
+        </div>
+
+      </section>
+
+
+      {/* ==================================================
+          CONTACT
+      ================================================== */}
+
+      <section
+        id="contact"
+        className="
+          flex
+          h-screen
+          w-full
+          items-center
+          justify-center
+          bg-red-500
+        "
+      >
+
+        <div className="text-center">
+
+          <p
+            className="
+              mb-6
+              text-sm
+              font-bold
+              uppercase
+              tracking-[0.5em]
+              text-red-100
+            "
+          >
+            05 — CONTACT
+          </p>
+
+          <h2
+            className="
+              text-7xl
+              font-black
+              text-white
+              md:text-9xl
+            "
+          >
+            CONTACT
+          </h2>
+
+        </div>
+
+      </section>
+
+
+      {/* ==================================================
+          FOOTER
+      ================================================== */}
+
+      <footer
+        id="footer"
+        className="
+          flex
+          min-h-screen
+          w-full
+          items-center
+          justify-center
+          bg-neutral-950
+          text-white
+        "
+      >
+
+        <div className="text-center">
+
+          <p
+            className="
+              mb-6
+              text-sm
+              font-bold
+              uppercase
+              tracking-[0.5em]
+              text-neutral-500
+            "
+          >
+            06 — FOOTER
+          </p>
+
+          <h2
+            className="
+              text-7xl
+              font-black
+              md:text-9xl
+            "
+          >
+            FOOTER
+          </h2>
+
+        </div>
+
+      </footer>
+
+    </main>
   );
 }
