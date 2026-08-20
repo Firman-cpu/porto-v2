@@ -1,603 +1,244 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+/**
+ * app/page.tsx
+ *
+ * ================================================================
+ * SCROLL ARCHITECTURE — FIXED LAYER APPROACH
+ * ================================================================
+ *
+ * Semua section adalah position:fixed, full viewport.
+ * Scroll dikontrol oleh satu tall <div id="scroll-driver">.
+ * GSAP ScrollTrigger trigger = scroll-driver, scrub transform.
+ *
+ * Layer stack (z-index):
+ *   Hero      z-10  — selalu di belakang
+ *   About     z-20  — layer di atas Hero
+ *   HorizWrap z-30  — layer di atas About (Skills + Tools)
+ *
+ * Fase scroll (scroll-driver height):
+ *   0         → vh*1   Hero visible, About di bawah (yPercent:100)
+ *   vh*1      → vh*2   About naik (yPercent 100→0) menutupi Hero
+ *   vh*2      → vh*3   About berhenti. HorizWrap masuk dari kanan (x: 100vw→0)
+ *   vh*3      → vh*3+W Horizontal scroll (track x: 0 → -W)
+ *                      W = track.scrollWidth - innerWidth
+ *   vh*3+W    → end    Projects, Contact, Footer (unfixed, normal)
+ *
+ * Setelah horizontal selesai:
+ *   Semua fixed layer di-unfix (position kembali normal via class toggle)
+ *   Projects dst muncul sebagai normal scroll.
+ *
+ * ================================================================
+ */
+
+import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
+import SmoothScrollProvider from "@/components/layout/SmoothScrollProvider";
+import HeroSection from "@/components/scenes/hero/HeroSection";
+import AboutSection from "@/components/scenes/about/AboutSection";
+import SkillsSection from "@/components/scenes/skills/SkillsSection";
+import ToolsSection from "@/components/scenes/tools/ToolsSection";
+import ProjectsSection from "@/components/scenes/projects/ProjectsSection";
+import ContactSection from "@/components/scenes/contact/ContactSection";
+import FooterSection from "@/components/scenes/footer/FooterSection";
+
 gsap.registerPlugin(ScrollTrigger);
 
-export default function Home() {
-  const aboutSceneRef = useRef<HTMLDivElement>(null);
-  const horizontalSceneRef = useRef<HTMLDivElement>(null);
-  const horizontalTrackRef = useRef<HTMLDivElement>(null);
+// vh multiplier per fase
+const VH_HERO = 1;    // Hero visible
+const VH_ABOUT_ENTER = 1;    // About naik
+const VH_ABOUT_STAY = 0.5;  // About berhenti sebelum Skills
+const VH_SKILLS_ENTER = 1;   // Skills+Tools masuk dari kanan
 
-  const aboutRef = useRef<HTMLElement>(null);
-  const skillsRef = useRef<HTMLElement>(null);
+export default function Home() {
+  const driverRef = useRef<HTMLDivElement>(null);
+  const aboutRef = useRef<HTMLDivElement>(null);
+  const horizRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  // Controls whether fixed layers are active
+  const [fixedDone, setFixedDone] = useState(false);
 
   useEffect(() => {
-    const aboutScene = aboutSceneRef.current;
-    const horizontalScene = horizontalSceneRef.current;
-    const track = horizontalTrackRef.current;
-
+    const driver = driverRef.current;
     const about = aboutRef.current;
-    const skills = skillsRef.current;
+    const horiz = horizRef.current;
+    const track = trackRef.current;
 
-    if (
-      !aboutScene ||
-      !horizontalScene ||
-      !track ||
-      !about ||
-      !skills
-    ) {
-      return;
-    }
+    if (!driver || !about || !horiz || !track) return;
 
     const ctx = gsap.context(() => {
-      // ==================================================
-      // INITIAL
-      // ==================================================
+      const vh = () => window.innerHeight;
+      const trackW = () => track.scrollWidth - window.innerWidth;
 
-      gsap.set(about, {
-        yPercent: 100,
-      });
+      // ── Set driver height ──────────────────────────────────
+      // Total fase fixed + 1vh buffer sebelum Projects muncul.
+      const totalFixed = () =>
+        (VH_HERO + VH_ABOUT_ENTER + VH_ABOUT_STAY + VH_SKILLS_ENTER) * vh() +
+        trackW();
 
-      gsap.set(skills, {
-        xPercent: 100,
-      });
+      const setDriverHeight = () => {
+        driver.style.height = `${totalFixed() + vh()}px`;
+      };
+      setDriverHeight();
 
-      // ==================================================
-      // 1. ABOUT
-      //
-      // HERO tetap normal di belakang.
-      //
-      // About masuk dari bawah.
-      // ==================================================
+      // ── Phase offsets (dari scroll-driver top) ─────────────
+      const pAboutStart = () => VH_HERO * vh();
+      const pAboutEnd = () => (VH_HERO + VH_ABOUT_ENTER) * vh();
+      const pSkillsStart = () => (VH_HERO + VH_ABOUT_ENTER + VH_ABOUT_STAY) * vh();
+      const pSkillsEnd = () => pSkillsStart() + VH_SKILLS_ENTER * vh();
+      const pHorizEnd = () => pSkillsEnd() + trackW();
 
+      // ── Initial states ─────────────────────────────────────
+      gsap.set(about, { yPercent: 100 });
+      gsap.set(horiz, { x: "100vw" });
+
+      // ── 1. About enter ─────────────────────────────────────
       gsap.to(about, {
         yPercent: 0,
-
         ease: "none",
-
         scrollTrigger: {
-          trigger: aboutScene,
-
-          start: "top top",
-
-          end: "bottom top",
-
+          trigger: driver,
+          start: () => `top+=${pAboutStart()} top`,
+          end: () => `top+=${pAboutEnd()}   top`,
           scrub: true,
-
-          pin: true,
-
-          pinSpacing: true,
-
-          anticipatePin: 1,
-        },
-      });
-
-      // ==================================================
-      // 2. SKILLS
-      //
-      // Setelah About selesai,
-      // Skills masuk dari kanan.
-      // ==================================================
-
-      gsap.to(skills, {
-        xPercent: 0,
-
-        ease: "none",
-
-        scrollTrigger: {
-          trigger: horizontalScene,
-
-          start: "top top",
-
-          end: () =>
-            `+=${window.innerHeight}`,
-
-          scrub: true,
-
-          pin: true,
-
-          pinSpacing: true,
-
-          anticipatePin: 1,
-        },
-      });
-
-      // ==================================================
-      // 3. HORIZONTAL
-      //
-      // Skills → Tools
-      // ==================================================
-
-      const getDistance = () => {
-        return (
-          track.scrollWidth -
-          window.innerWidth
-        );
-      };
-
-      gsap.to(track, {
-        x: () => -getDistance(),
-
-        ease: "none",
-
-        scrollTrigger: {
-          trigger: horizontalScene,
-
-          start: () =>
-            `top+=${window.innerHeight} top`,
-
-          end: () =>
-            `+=${getDistance()}`,
-
-          scrub: true,
-
           invalidateOnRefresh: true,
         },
       });
 
-      // ==================================================
-      // REFRESH
-      // ==================================================
+      // ── 2. HorizWrap enter (Skills+Tools dari kanan) ───────
+      gsap.to(horiz, {
+        x: 0,
+        ease: "none",
+        scrollTrigger: {
+          trigger: driver,
+          start: () => `top+=${pSkillsStart()} top`,
+          end: () => `top+=${pSkillsEnd()}   top`,
+          scrub: true,
+          invalidateOnRefresh: true,
+        },
+      });
+
+      // ── 3. Horizontal scroll (Skills → Tools) ─────────────
+      gsap.to(track, {
+        x: () => -trackW(),
+        ease: "none",
+        scrollTrigger: {
+          trigger: driver,
+          start: () => `top+=${pSkillsEnd()} top`,
+          end: () => `top+=${pHorizEnd()}  top`,
+          scrub: true,
+          invalidateOnRefresh: true,
+          onLeave: () => setFixedDone(true),
+          onEnterBack: () => setFixedDone(false),
+        },
+      });
+
+      // ── Resize ────────────────────────────────────────────
+      const onResize = () => {
+        setDriverHeight();
+        ScrollTrigger.refresh();
+      };
+      window.addEventListener("resize", onResize, { passive: true });
 
       ScrollTrigger.refresh();
+
+      return () => window.removeEventListener("resize", onResize);
     });
 
-    return () => {
-      ctx.revert();
-    };
+    return () => ctx.revert();
   }, []);
 
   return (
-    <main
-      className="
-        w-full
-        overflow-x-hidden
-        bg-neutral-950
-      "
-    >
+    <SmoothScrollProvider>
+      {/*
+       * scroll-driver: satu-satunya elemen yang punya height.
+       * Semua fixed layers berada di luar flow normal.
+       */}
+      <div ref={driverRef} className="relative w-full" />
 
-      {/* ==================================================
-          HERO
-      ================================================== */}
+      {/*
+       * FIXED LAYERS — position:fixed, full viewport.
+       * Aktif selama fixedDone = false.
+       * Setelah horizontal selesai, diganti position:relative
+       * agar Projects bisa scroll normal.
+       *
+       * Semua ada di LUAR scroll-driver supaya tidak
+       * terpengaruh height driver.
+       */}
 
+      {/* HERO — z-10, always behind */}
       <section
         id="hero"
-        className="
-          relative
-          z-0
-          flex
-          h-screen
-          w-full
-          items-center
-          justify-center
+        aria-label="Hero"
+        className={`
+          ${fixedDone ? "relative" : "fixed inset-0"}
+          z-10 flex h-screen w-full
+          flex-col items-center justify-center
           overflow-hidden
-          bg-orange-500
-        "
+          bg-[var(--color-primary-500)]
+        `}
       >
-
-        <div className="text-center">
-
-          <p
-            className="
-              mb-6
-              text-sm
-              font-bold
-              uppercase
-              tracking-[0.5em]
-              text-orange-100
-            "
-          >
-            PORTFOLIO
+        <div
+          className="pointer-events-none absolute inset-0 bg-dot-pattern opacity-20"
+          aria-hidden="true"
+        />
+        <div className="relative z-10 px-6 text-center">
+          <p className="mb-6 text-xs font-semibold uppercase tracking-[0.5em] text-white/60">
+            Portfolio — Firman Bintang Narendra
           </p>
-
-          <h1
-            className="
-              text-7xl
-              font-black
-              text-white
-              md:text-9xl
-            "
-          >
+          <h1 className="text-[clamp(3rem,10vw,8rem)] font-extrabold leading-none tracking-tight text-white">
             HERO
           </h1>
-
-          <p
-            className="
-              mt-6
-              text-lg
-              text-orange-100
-            "
-          >
-            Creative Developer
+          <p className="mt-4 text-base text-white/70">
+            Front-End Developer · UI/UX Designer · Motion Creative
           </p>
-
-          <p
-            className="
-              mt-10
-              text-sm
-              uppercase
-              tracking-[0.4em]
-              text-orange-100
-            "
-          >
+          <p className="mt-12 text-xs uppercase tracking-[0.4em] text-white/50">
             Scroll ↓
           </p>
-
         </div>
-
       </section>
 
-
-      {/* ==================================================
-          ABOUT SCENE
-      ================================================== */}
-
-      <section
-        ref={aboutSceneRef}
-        className="
-          relative
-          h-[200vh]
-          w-full
-        "
+      {/* ABOUT — z-20, layer di atas Hero */}
+      <div
+        ref={aboutRef}
+        className={`
+          ${fixedDone ? "relative" : "fixed inset-0"}
+          z-20
+        `}
       >
+        <AboutSection />
+      </div>
 
-        {/* ==================================================
-            ABOUT
-        ================================================== */}
-
-        <section
-          ref={aboutRef}
-          id="about"
-          className="
-            absolute
-            left-0
-            top-0
-            z-10
-            flex
-            h-screen
-            w-full
-            items-center
-            justify-center
-            bg-white
-          "
-        >
-
-          <div className="text-center">
-
-            <p
-              className="
-                mb-6
-                text-sm
-                font-bold
-                uppercase
-                tracking-[0.5em]
-                text-orange-500
-              "
-            >
-              01 — ABOUT
-            </p>
-
-            <h2
-              className="
-                text-7xl
-                font-black
-                text-neutral-900
-                md:text-9xl
-              "
-            >
-              ABOUT
-            </h2>
-
-            <p
-              className="
-                mt-6
-                text-lg
-                text-neutral-500
-              "
-            >
-              About berhenti di sini.
-            </p>
-
-          </div>
-
-        </section>
-
-      </section>
-
-
-      {/* ==================================================
-          HORIZONTAL SCENE
-      ================================================== */}
-
-      <section
-        ref={horizontalSceneRef}
-        className="
-          relative
-          h-[200vh]
-          w-full
-          overflow-hidden
-        "
+      {/* HORIZ WRAP — z-30, layer di atas About */}
+      <div
+        ref={horizRef}
+        className={`
+          ${fixedDone ? "relative" : "fixed inset-0"}
+          z-30 overflow-hidden
+        `}
       >
-
-        {/* ==================================================
-            HORIZONTAL TRACK
-        ================================================== */}
-
+        {/* Track flex — GSAP animasi x */}
         <div
-          ref={horizontalTrackRef}
-          className="
-            sticky
-            top-0
-            flex
-            h-screen
-            w-max
-          "
+          ref={trackRef}
+          className="flex h-full w-max"
         >
-
-          {/* ==================================================
-              SKILLS
-          ================================================== */}
-
-          <section
-            ref={skillsRef}
-            id="skills"
-            className="
-              flex
-              h-screen
-              w-screen
-              shrink-0
-              items-center
-              justify-center
-              bg-blue-500
-            "
-          >
-
-            <div className="text-center">
-
-              <p
-                className="
-                  mb-6
-                  text-sm
-                  font-bold
-                  uppercase
-                  tracking-[0.5em]
-                  text-blue-100
-                "
-              >
-                02 — SKILLS
-              </p>
-
-              <h2
-                className="
-                  text-7xl
-                  font-black
-                  text-white
-                  md:text-9xl
-                "
-              >
-                SKILLS
-              </h2>
-
-              <p
-                className="
-                  mt-6
-                  text-lg
-                  text-blue-100
-                "
-              >
-                Masuk dari kanan →
-              </p>
-
-            </div>
-
-          </section>
-
-
-          {/* ==================================================
-              TOOLS
-          ================================================== */}
-
-          <section
-            id="tools"
-            className="
-              flex
-              h-screen
-              w-screen
-              shrink-0
-              items-center
-              justify-center
-              bg-purple-500
-            "
-          >
-
-            <div className="text-center">
-
-              <p
-                className="
-                  mb-6
-                  text-sm
-                  font-bold
-                  uppercase
-                  tracking-[0.5em]
-                  text-purple-100
-                "
-              >
-                03 — TOOLS
-              </p>
-
-              <h2
-                className="
-                  text-7xl
-                  font-black
-                  text-white
-                  md:text-9xl
-                "
-              >
-                TOOLS
-              </h2>
-
-              <p
-                className="
-                  mt-6
-                  text-lg
-                  text-purple-100
-                "
-              >
-                Horizontal selesai ↓
-              </p>
-
-            </div>
-
-          </section>
-
+          <SkillsSection />
+          <ToolsSection />
         </div>
+      </div>
 
-      </section>
+      {/* NORMAL FLOW — muncul setelah horizontal selesai */}
+      {fixedDone && (
+        <>
+          <ProjectsSection />
+          <ContactSection />
+          <FooterSection />
+        </>
+      )}
 
-
-      {/* ==================================================
-          PROJECTS
-      ================================================== */}
-
-      <section
-        id="projects"
-        className="
-          flex
-          h-screen
-          w-full
-          items-center
-          justify-center
-          bg-green-500
-        "
-      >
-
-        <div className="text-center">
-
-          <p
-            className="
-              mb-6
-              text-sm
-              font-bold
-              uppercase
-              tracking-[0.5em]
-              text-green-100
-            "
-          >
-            04 — PROJECTS
-          </p>
-
-          <h2
-            className="
-              text-7xl
-              font-black
-              text-white
-              md:text-9xl
-            "
-          >
-            PROJECTS
-          </h2>
-
-        </div>
-
-      </section>
-
-
-      {/* ==================================================
-          CONTACT
-      ================================================== */}
-
-      <section
-        id="contact"
-        className="
-          flex
-          h-screen
-          w-full
-          items-center
-          justify-center
-          bg-red-500
-        "
-      >
-
-        <div className="text-center">
-
-          <p
-            className="
-              mb-6
-              text-sm
-              font-bold
-              uppercase
-              tracking-[0.5em]
-              text-red-100
-            "
-          >
-            05 — CONTACT
-          </p>
-
-          <h2
-            className="
-              text-7xl
-              font-black
-              text-white
-              md:text-9xl
-            "
-          >
-            CONTACT
-          </h2>
-
-        </div>
-
-      </section>
-
-
-      {/* ==================================================
-          FOOTER
-      ================================================== */}
-
-      <footer
-        id="footer"
-        className="
-          flex
-          min-h-screen
-          w-full
-          items-center
-          justify-center
-          bg-neutral-950
-          text-white
-        "
-      >
-
-        <div className="text-center">
-
-          <p
-            className="
-              mb-6
-              text-sm
-              font-bold
-              uppercase
-              tracking-[0.5em]
-              text-neutral-500
-            "
-          >
-            06 — FOOTER
-          </p>
-
-          <h2
-            className="
-              text-7xl
-              font-black
-              md:text-9xl
-            "
-          >
-            FOOTER
-          </h2>
-
-        </div>
-
-      </footer>
-
-    </main>
+    </SmoothScrollProvider>
   );
 }

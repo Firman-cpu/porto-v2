@@ -1,28 +1,176 @@
 @import "tailwindcss";
 
+/* ==========================================================
+   DESIGN TOKENS
+   ========================================================== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --primary-color: #4502b0;
-  --secondary-color: #082b8a;
+  /* Primary — Candy Blue */
+  --color-primary-50: #eff8ff;
+  --color-primary-100: #dbeffe;
+  --color-primary-200: #bfe3fd;
+  --color-primary-300: #93d3fb;
+  --color-primary-400: #60bcf7;
+  --color-primary-500: #3ba1f2;
+  --color-primary-600: #2582e6;
+  --color-primary-700: #1d6cd4;
+  --color-primary-800: #1e56ab;
+  --color-primary-900: #1e4987;
+
+  /* Secondary — Soft Cyan */
+  --color-cyan-300: #7dd3e8;
+  --color-cyan-400: #4fc3db;
+
+  /* Secondary — Lavender */
+  --color-lavender-300: #c4b5fd;
+  --color-lavender-400: #a78bfa;
+
+  /* Secondary — Peach */
+  --color-peach-300: #fdba74;
+  --color-peach-400: #fb923c;
+
+  /* Neutral */
+  --color-white: #ffffff;
+  --color-off-white: #f8f9fc;
+  --color-gray-50: #f4f6f9;
+  --color-gray-100: #e8ecf2;
+  --color-gray-200: #d1d9e6;
+  --color-gray-400: #8994a8;
+  --color-gray-600: #4b5563;
+  --color-navy: #0d1b2e;
+  --color-near-black: #080f1a;
+
+  /* Typography */
+  --font-sans: var(--font-plus-jakarta), system-ui, sans-serif;
+
+  /* Spacing rhythm */
+  --section-gap: 0px;
+
+  /* Z-index scale */
+  --z-base: 0;
+  --z-scene: 10;
+  --z-ui: 20;
+  --z-nav: 30;
+  --z-cursor: 40;
+  --z-modal: 50;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ==========================================================
+   RESET / BASE
+   ========================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  /* Lenis will handle smooth scroll — disable native smooth */
+  scroll-behavior: auto;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  background-color: var(--color-white);
+  color: var(--color-navy);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ==========================================================
+   TYPOGRAPHY SCALE
+   ========================================================== */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+/* ==========================================================
+   HORIZONTAL SCROLL UTILITY
+   Lenis needs the main scroll container to be the root.
+   ========================================================== */
+
+.horizontal-track {
+  display: flex;
+  flex-wrap: nowrap;
+  will-change: transform;
+}
+
+/* ==========================================================
+   SECTION BASE
+   ========================================================== */
+
+.section-full {
+  position: relative;
+  width: 100%;
+  min-height: 100svh;
+}
+
+/* ==========================================================
+   ACCESSIBILITY — Reduced Motion
+   ========================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================
+   SUBTLE BACKGROUND DOT PATTERN
+   ========================================================== */
+
+.bg-dot-pattern {
+  background-image: radial-gradient(circle,
+      var(--color-gray-200) 1px,
+      transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* ==========================================================
+   CURSOR (will be styled via JS — base shape here)
+   ========================================================== */
+
+.cursor-dot,
+.cursor-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: var(--z-cursor);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.cursor-dot {
+  width: 6px;
+  height: 6px;
+  background-color: var(--color-primary-500);
+}
+
+.cursor-ring {
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid var(--color-primary-400);
+  background: transparent;
+  opacity: 0.6;
 }
