@@ -4,34 +4,35 @@
  * app/page.tsx
  *
  * ================================================================
- * SCROLL ARCHITECTURE — FIXED LAYER APPROACH
+ * SCROLL ARCHITECTURE — FIXED LAYER + NORMAL FLOW
  * ================================================================
  *
- * Semua section adalah position:fixed, full viewport.
- * Scroll dikontrol oleh satu tall <div id="scroll-driver">.
- * GSAP ScrollTrigger trigger = scroll-driver, scrub transform.
+ * Layer stack (position:fixed, selalu):
+ *   Hero      z-10
+ *   About     z-20  — GSAP: yPercent 100→0
+ *   HorizWrap z-30  — GSAP: x "100vw"→0, lalu track scroll horizontal
  *
- * Layer stack (z-index):
- *   Hero      z-10  — selalu di belakang
- *   About     z-20  — layer di atas Hero
- *   HorizWrap z-30  — layer di atas About (Skills + Tools)
+ * Scroll dikendalikan oleh scroll-driver (div dengan height eksplisit).
+ * Fase scroll:
+ *   [0      → 1vh]       Hero visible
+ *   [1vh    → 2vh]       About naik menutupi Hero
+ *   [2vh    → 2.5vh]     About berhenti (jeda)
+ *   [2.5vh  → 3.5vh]     HorizWrap masuk dari kanan
+ *   [3.5vh  → 3.5vh+W]   Horizontal scroll Skills→Tools
  *
- * Fase scroll (scroll-driver height):
- *   0         → vh*1   Hero visible, About di bawah (yPercent:100)
- *   vh*1      → vh*2   About naik (yPercent 100→0) menutupi Hero
- *   vh*2      → vh*3   About berhenti. HorizWrap masuk dari kanan (x: 100vw→0)
- *   vh*3      → vh*3+W Horizontal scroll (track x: 0 → -W)
- *                      W = track.scrollWidth - innerWidth
- *   vh*3+W    → end    Projects, Contact, Footer (unfixed, normal)
+ * Setelah driver habis:
+ *   Fixed layers tetap ada (tidak toggle class) tapi
+ *   Projects z-40 scroll normal DI BAWAH fixed layers —
+ *   karena fixed layers tidak ikut flow, Projects muncul
+ *   setelah driver height.
  *
- * Setelah horizontal selesai:
- *   Semua fixed layer di-unfix (position kembali normal via class toggle)
- *   Projects dst muncul sebagai normal scroll.
- *
+ *   Namun fixed layers masih terlihat karena position:fixed.
+ *   Solusi: GSAP fade out fixed layers saat driver mendekati akhir,
+ *   sebelum Projects mulai masuk viewport.
  * ================================================================
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -46,56 +47,55 @@ import FooterSection from "@/components/scenes/footer/FooterSection";
 
 gsap.registerPlugin(ScrollTrigger);
 
-// vh multiplier per fase
-const VH_HERO = 1;    // Hero visible
-const VH_ABOUT_ENTER = 1;    // About naik
-const VH_ABOUT_STAY = 0.5;  // About berhenti sebelum Skills
-const VH_SKILLS_ENTER = 1;   // Skills+Tools masuk dari kanan
+// ── Fase scroll (× vh) ────────────────────────────────────────
+const VH_HERO = 1;    // Hero visible sebelum About masuk
+const VH_ABOUT_ENTER = 1;    // About naik dari bawah
+const VH_ABOUT_STAY = 0.5;  // Jeda sebelum Skills masuk
+const VH_SKILLS_ENTER = 1;    // HorizWrap masuk dari kanan
+const VH_PUSH_OUT = 1;    // Fixed layers scroll naik saat Projects masuk
 
 export default function Home() {
   const driverRef = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLElement>(null);
   const aboutRef = useRef<HTMLDivElement>(null);
   const horizRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
 
-  // Controls whether fixed layers are active
-  const [fixedDone, setFixedDone] = useState(false);
-
   useEffect(() => {
     const driver = driverRef.current;
+    const hero = heroRef.current;
     const about = aboutRef.current;
     const horiz = horizRef.current;
     const track = trackRef.current;
 
-    if (!driver || !about || !horiz || !track) return;
+    if (!driver || !hero || !about || !horiz || !track) return;
 
     const ctx = gsap.context(() => {
       const vh = () => window.innerHeight;
       const trackW = () => track.scrollWidth - window.innerWidth;
 
-      // ── Set driver height ──────────────────────────────────
-      // Total fase fixed + 1vh buffer sebelum Projects muncul.
-      const totalFixed = () =>
-        (VH_HERO + VH_ABOUT_ENTER + VH_ABOUT_STAY + VH_SKILLS_ENTER) * vh() +
-        trackW();
-
-      const setDriverHeight = () => {
-        driver.style.height = `${totalFixed() + vh()}px`;
-      };
-      setDriverHeight();
-
-      // ── Phase offsets (dari scroll-driver top) ─────────────
+      // ── Phase boundaries ──────────────────────────────────
       const pAboutStart = () => VH_HERO * vh();
       const pAboutEnd = () => (VH_HERO + VH_ABOUT_ENTER) * vh();
       const pSkillsStart = () => (VH_HERO + VH_ABOUT_ENTER + VH_ABOUT_STAY) * vh();
       const pSkillsEnd = () => pSkillsStart() + VH_SKILLS_ENTER * vh();
       const pHorizEnd = () => pSkillsEnd() + trackW();
+      const pPushStart = () => pHorizEnd();
+      const pPushEnd = () => pHorizEnd() + VH_PUSH_OUT * vh();
 
-      // ── Initial states ─────────────────────────────────────
+      // ── Driver height ─────────────────────────────────────
+      // Driver selesai tepat saat fixed layers sudah naik penuh.
+      // Projects muncul tepat setelah driver — tidak perlu buffer.
+      const setDriverHeight = () => {
+        driver.style.height = `${pPushEnd()}px`;
+      };
+      setDriverHeight();
+
+      // ── Initial states ────────────────────────────────────
       gsap.set(about, { yPercent: 100 });
       gsap.set(horiz, { x: "100vw" });
 
-      // ── 1. About enter ─────────────────────────────────────
+      // ── 1. About enter ────────────────────────────────────
       gsap.to(about, {
         yPercent: 0,
         ease: "none",
@@ -108,7 +108,7 @@ export default function Home() {
         },
       });
 
-      // ── 2. HorizWrap enter (Skills+Tools dari kanan) ───────
+      // ── 2. HorizWrap enter ────────────────────────────────
       gsap.to(horiz, {
         x: 0,
         ease: "none",
@@ -121,7 +121,7 @@ export default function Home() {
         },
       });
 
-      // ── 3. Horizontal scroll (Skills → Tools) ─────────────
+      // ── 3. Horizontal scroll ──────────────────────────────
       gsap.to(track, {
         x: () => -trackW(),
         ease: "none",
@@ -131,8 +131,22 @@ export default function Home() {
           end: () => `top+=${pHorizEnd()}  top`,
           scrub: true,
           invalidateOnRefresh: true,
-          onLeave: () => setFixedDone(true),
-          onEnterBack: () => setFixedDone(false),
+        },
+      });
+
+      // ── 4. Fixed layers scroll naik saat Projects masuk ─────
+      // Setelah horizontal selesai, semua fixed layers di-push
+      // ke atas (y: 0 → -100vh) seiring Projects masuk dari bawah.
+      // Efek: seperti Projects mendorong mereka naik — scroll biasa.
+      gsap.to([hero, about, horiz], {
+        y: "-100vh",
+        ease: "none",
+        scrollTrigger: {
+          trigger: driver,
+          start: () => `top+=${pPushStart()} top`,
+          end: () => `top+=${pPushEnd()}   top`,
+          scrub: true,
+          invalidateOnRefresh: true,
         },
       });
 
@@ -142,7 +156,6 @@ export default function Home() {
         ScrollTrigger.refresh();
       };
       window.addEventListener("resize", onResize, { passive: true });
-
       ScrollTrigger.refresh();
 
       return () => window.removeEventListener("resize", onResize);
@@ -153,74 +166,61 @@ export default function Home() {
 
   return (
     <SmoothScrollProvider>
+
       {/*
-       * scroll-driver: satu-satunya elemen yang punya height.
-       * Semua fixed layers berada di luar flow normal.
+       * SCROLL DRIVER — satu-satunya elemen dengan height.
+       * Fixed layers trigger terhadap elemen ini.
+       * Projects/Contact/Footer ada setelah driver dalam
+       * normal document flow.
        */}
       <div ref={driverRef} className="relative w-full" />
 
       {/*
-       * FIXED LAYERS — position:fixed, full viewport.
-       * Aktif selama fixedDone = false.
-       * Setelah horizontal selesai, diganti position:relative
-       * agar Projects bisa scroll normal.
-       *
-       * Semua ada di LUAR scroll-driver supaya tidak
-       * terpengaruh height driver.
+       * NORMAL FLOW — Projects, Contact, Footer.
+       * Berada setelah driver, sehingga muncul setelah
+       * driver selesai di-scroll.
+       * z-index tidak diperlukan — mereka normal flow,
+       * fixed layers di atasnya sudah fade out via GSAP.
+       */}
+      <ProjectsSection />
+      <ContactSection />
+      <FooterSection />
+
+      {/*
+       * FIXED LAYERS — selalu position:fixed.
+       * Tidak ada toggle class, tidak ada conditional render.
+       * GSAP autoAlpha mengontrol visibilitas saat selesai.
        */}
 
-      {/* HERO — z-10, always behind */}
+      {/* HERO z-10 */}
       <section
+        ref={heroRef}
         id="hero"
         aria-label="Hero"
-        className={`
-          ${fixedDone ? "relative" : "fixed inset-0"}
-          z-10 flex h-screen w-full
+        className="
+          fixed inset-0 z-10
+          flex h-screen w-full
           flex-col items-center justify-center
           overflow-hidden
           bg-[var(--color-primary-500)]
-        `}
+        "
       >
-        <div
-          className="pointer-events-none absolute inset-0 bg-dot-pattern opacity-20"
-          aria-hidden="true"
-        />
-        <div className="relative z-10 px-6 text-center">
-          <p className="mb-6 text-xs font-semibold uppercase tracking-[0.5em] text-white/60">
-            Portfolio — Firman Bintang Narendra
-          </p>
-          <h1 className="text-[clamp(3rem,10vw,8rem)] font-extrabold leading-none tracking-tight text-white">
-            HERO
-          </h1>
-          <p className="mt-4 text-base text-white/70">
-            Front-End Developer · UI/UX Designer · Motion Creative
-          </p>
-          <p className="mt-12 text-xs uppercase tracking-[0.4em] text-white/50">
-            Scroll ↓
-          </p>
-        </div>
+        <HeroSection />
       </section>
 
-      {/* ABOUT — z-20, layer di atas Hero */}
+      {/* ABOUT z-20 */}
       <div
         ref={aboutRef}
-        className={`
-          ${fixedDone ? "relative" : "fixed inset-0"}
-          z-20
-        `}
+        className="fixed inset-0 z-20"
       >
         <AboutSection />
       </div>
 
-      {/* HORIZ WRAP — z-30, layer di atas About */}
+      {/* HORIZ WRAP z-30 */}
       <div
         ref={horizRef}
-        className={`
-          ${fixedDone ? "relative" : "fixed inset-0"}
-          z-30 overflow-hidden
-        `}
+        className="fixed inset-0 z-30 overflow-hidden"
       >
-        {/* Track flex — GSAP animasi x */}
         <div
           ref={trackRef}
           className="flex h-full w-max"
@@ -229,15 +229,6 @@ export default function Home() {
           <ToolsSection />
         </div>
       </div>
-
-      {/* NORMAL FLOW — muncul setelah horizontal selesai */}
-      {fixedDone && (
-        <>
-          <ProjectsSection />
-          <ContactSection />
-          <FooterSection />
-        </>
-      )}
 
     </SmoothScrollProvider>
   );
