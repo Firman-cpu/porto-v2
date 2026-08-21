@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+import Navigation from "@/components/navigation/Navigation";
 
 // ==========================================================
 // FONT
@@ -48,6 +49,7 @@ export default function RootLayout({
       className={`${plusJakartaSans.variable} h-full overflow-x-hidden antialiased`}
     >
       <body className="relative min-h-full bg-white text-navy">
+        <Navigation />
         {children}
       </body>
     </html>
